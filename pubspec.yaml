@@ -1,0 +1,57 @@
+name: student_flow
+description: Приложение для студентов - расписание, дедлайны, преподаватели.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # Управление состоянием
+  provider: ^6.0.5
+  
+  # Локальная база данных
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  
+  # Форматирование дат и текста
+  intl: ^0.18.0
+  
+  # Уведомления
+  flutter_local_notifications: ^16.1.0
+  
+  # Шрифты
+  google_fonts: ^6.1.0
+  
+  # Запуск звонков и ссылок
+  url_launcher: ^6.2.1
+  
+  # Календарь
+  table_calendar: ^3.0.9
+  
+  # Сохранение настроек
+  shared_preferences: ^2.2.2
+  
+  # Иконки
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # Генерация кода для Hive
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.6
+  
+  # Линтер
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  
+  # Если будут картинки/иконки
+  assets:
+    - assets/images/
