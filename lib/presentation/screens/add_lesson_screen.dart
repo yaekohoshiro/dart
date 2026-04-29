@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../data/models/lesson_model.dart';
+import '../../data/models/teacher_model.dart';
 import '../providers/app_provider.dart';
 
 class AddLessonScreen extends StatefulWidget {
-  final Lesson? lesson; // Если null - создание, иначе - редактирование
+  final Lesson? lesson;
 
   const AddLessonScreen({super.key, this.lesson});
 
@@ -16,12 +17,13 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
   final _formKey = GlobalKey<FormState>();
   
   late TextEditingController _subjectController;
-  late TextEditingController _teacherController;
   late TextEditingController _roomController;
   late TextEditingController _startTimeController;
   late TextEditingController _endTimeController;
   
-  int _selectedDay = 1;
+  DateTime _selectedDate = DateTime.now();
+  int? _selectedTeacherId;
+  String? _selectedSubject;
   bool _isEditing = false;
 
   @override
@@ -30,20 +32,26 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
     _isEditing = widget.lesson != null;
     
     _subjectController = TextEditingController(text: widget.lesson?.subjectName ?? '');
-    _teacherController = TextEditingController(text: widget.lesson?.teacherName ?? '');
     _roomController = TextEditingController(text: widget.lesson?.roomNumber ?? '');
     _startTimeController = TextEditingController(text: widget.lesson?.startTime ?? '');
     _endTimeController = TextEditingController(text: widget.lesson?.endTime ?? '');
     
     if (widget.lesson != null) {
-      _selectedDay = widget.lesson!.dayOfWeek;
+      _selectedDate = widget.lesson!.date;
+      // Ищем ID преподавателя по имени
+      final providers = context.read<AppProvider>();
+      final teacher = providers.teachers.firstWhere(
+        (t) => t.fullName == widget.lesson!.teacherName,
+        orElse: () => Teacher(id: 0, fullName: '', subjects: [], phone: '', email: ''),
+      );
+      _selectedTeacherId = teacher.id > 0 ? teacher.id : null;
+      _selectedSubject = widget.lesson!.subjectName;
     }
   }
 
   @override
   void dispose() {
     _subjectController.dispose();
-    _teacherController.dispose();
     _roomController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
@@ -68,18 +76,70 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
     }
   }
 
+  Future<void> _selectDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+    );
+    
+    if (date != null) {
+      setState(() => _selectedDate = date);
+    }
+  }
+
+  void _onTeacherSelected(int? teacherId) {
+    setState(() {
+      _selectedTeacherId = teacherId;
+      _selectedSubject = null;
+      
+      if (teacherId != null) {
+        final provider = context.read<AppProvider>();
+        final teacher = provider.teachers.firstWhere(
+          (t) => t.id == teacherId,
+          orElse: () => Teacher(id: 0, fullName: '', subjects: [], phone: '', email: ''),
+        );
+        if (teacher.subjects.isNotEmpty) {
+          _selectedSubject = teacher.subjects.first;
+          _subjectController.text = _selectedSubject!;
+        }
+      }
+    });
+  }
+
+  void _onSubjectSelected(String? subject) {
+    setState(() {
+      _selectedSubject = subject;
+      _subjectController.text = subject ?? '';
+    });
+  }
+
   void _saveLesson() {
     if (_formKey.currentState!.validate()) {
+      if (_selectedTeacherId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Выберите преподавателя')),
+        );
+        return;
+      }
+
       final provider = context.read<AppProvider>();
       
+      // Находим преподавателя по ID
+      final teacher = provider.teachers.firstWhere(
+        (t) => t.id == _selectedTeacherId,
+        orElse: () => Teacher(id: 0, fullName: '', subjects: [], phone: '', email: ''),
+      );
+
       final lesson = Lesson(
-        id: widget.lesson?.id ?? provider.generateLessonId(),
+        id: widget.lesson?.id ?? 0,
         subjectName: _subjectController.text.trim(),
-        teacherName: _teacherController.text.trim(),
+        teacherName: teacher.fullName,
         roomNumber: _roomController.text.trim(),
         startTime: _startTimeController.text,
         endTime: _endTimeController.text,
-        dayOfWeek: _selectedDay,
+        date: _selectedDate,
       );
       
       if (_isEditing) {
@@ -100,6 +160,9 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Редактировать пару' : 'Добавить пару'),
@@ -111,107 +174,194 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Название предмета
-              TextFormField(
-                controller: _subjectController,
-                decoration: const InputDecoration(
-                  labelText: 'Предмет *',
-                  prefixIcon: Icon(Icons.book),
+              // Дата
+              Text(
+                'Дата *',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: textColor),
+              ),
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: _selectDate,
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(12),
+                    color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: Theme.of(context).primaryColor),
+                      const SizedBox(width: 16),
+                      Text(
+                        '${_getDayShortName(_selectedDate.weekday)}, ${_selectedDate.day}.${_selectedDate.month}.${_selectedDate.year}',
+                        style: TextStyle(fontSize: 16, color: textColor),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.chevron_right),
+                    ],
+                  ),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Введите название предмета';
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Выбор преподавателя
+              Text(
+                'Преподаватель *',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: textColor),
+              ),
+              const SizedBox(height: 8),
+              Consumer<AppProvider>(
+                builder: (context, provider, child) {
+                  final teachers = provider.teachers;
+                  
+                  if (teachers.isEmpty) {
+                    return Card(
+                      color: Colors.orange.withOpacity(0.2),
+                      child: const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.orange),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Нет преподавателей',
+                                    style: TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    'Сначала добавьте преподавателей в разделе "Преподаватели"',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
                   }
-                  return null;
+                  
+                  return DropdownButtonFormField<int>(
+                    value: _selectedTeacherId,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    hint: const Text('Выберите преподавателя'),
+                    items: teachers.map((teacher) {
+                      return DropdownMenuItem(
+                        value: teacher.id,
+                        child: Text(teacher.fullName),
+                      );
+                    }).toList(),
+                    onChanged: _onTeacherSelected,
+                    validator: (value) {
+                      if (value == null) {
+                        return 'Выберите преподавателя';
+                      }
+                      return null;
+                    },
+                  );
                 },
               ),
               
               const SizedBox(height: 16),
               
-              // Преподаватель
-              TextFormField(
-                controller: _teacherController,
-                decoration: const InputDecoration(
-                  labelText: 'Преподаватель *',
-                  prefixIcon: Icon(Icons.person),
+              // Выбор предмета (из предметов преподавателя)
+              if (_selectedTeacherId != null) ...[
+                Consumer<AppProvider>(
+                  builder: (context, provider, child) {
+                    final teacher = provider.teachers.firstWhere(
+                      (t) => t.id == _selectedTeacherId,
+                      orElse: () => Teacher(id: 0, fullName: '', subjects: [], phone: '', email: ''),
+                    );
+                    
+                    if (teacher.subjects.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Предмет *',
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: textColor),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: _selectedSubject,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.book),
+                          ),
+                          items: teacher.subjects.map((subject) {
+                            return DropdownMenuItem(
+                              value: subject,
+                              child: Text(subject),
+                            );
+                          }).toList(),
+                          onChanged: _onSubjectSelected,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Выберите предмет';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                    );
+                  },
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Введите имя преподавателя';
-                  }
-                  return null;
-                },
-              ),
-              
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
+              ],
               
               // Аудитория
               TextFormField(
                 controller: _roomController,
+                style: TextStyle(color: textColor),
                 decoration: const InputDecoration(
-                  labelText: 'Аудитория *',
+                  labelText: 'Аудитория',
                   prefixIcon: Icon(Icons.location_on),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Введите номер аудитории';
-                  }
-                  return null;
-                },
               ),
               
               const SizedBox(height: 24),
               
-              // День недели
+              // Время проведения
               Text(
-                'День недели',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                initialValue: _selectedDay,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.calendar_today),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 1, child: Text('Понедельник')),
-                  DropdownMenuItem(value: 2, child: Text('Вторник')),
-                  DropdownMenuItem(value: 3, child: Text('Среда')),
-                  DropdownMenuItem(value: 4, child: Text('Четверг')),
-                  DropdownMenuItem(value: 5, child: Text('Пятница')),
-                  DropdownMenuItem(value: 6, child: Text('Суббота')),
-                  DropdownMenuItem(value: 7, child: Text('Воскресенье')),
-                ],
-                onChanged: (value) {
-                  setState(() => _selectedDay = value!);
-                },
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Время начала
-              Text(
-                'Время проведения',
-                style: Theme.of(context).textTheme.titleMedium,
+                'Время проведения *',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: textColor),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: _startTimeController,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Начало *',
-                        prefixIcon: Icon(Icons.access_time),
-                      ),
+                    child: InkWell(
                       onTap: () => _selectTime(true),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Выберите время';
-                        }
-                        return null;
-                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(12),
+                          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.access_time),
+                            const SizedBox(width: 12),
+                            Text(
+                              _startTimeController.text.isEmpty ? 'Начало' : _startTimeController.text,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: _startTimeController.text.isEmpty ? Colors.grey : textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   
@@ -221,20 +371,29 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
                   ),
                   
                   Expanded(
-                    child: TextFormField(
-                      controller: _endTimeController,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Конец *',
-                        prefixIcon: Icon(Icons.access_time),
-                      ),
+                    child: InkWell(
                       onTap: () => _selectTime(false),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Выберите время';
-                        }
-                        return null;
-                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey),
+                          borderRadius: BorderRadius.circular(12),
+                          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.access_time),
+                            const SizedBox(width: 12),
+                            Text(
+                              _endTimeController.text.isEmpty ? 'Конец' : _endTimeController.text,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: _endTimeController.text.isEmpty ? Colors.grey : textColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -261,5 +420,10 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
         ),
       ),
     );
+  }
+
+  String _getDayShortName(int weekday) {
+    const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    return days[weekday - 1];
   }
 }

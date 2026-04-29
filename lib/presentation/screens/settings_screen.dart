@@ -1,41 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/app_provider.dart';
-import 'onboarding_screen.dart';
+import '../providers/theme_provider.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool _isDarkMode = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadThemeSetting();
-  }
-
-  Future<void> _loadThemeSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _isDarkMode = prefs.getBool('isDarkMode') ?? false;
-    });
-  }
-
-  Future<void> _toggleTheme(bool value) async {
-    setState(() => _isDarkMode = value);
-    
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkMode', value);
-    
-    // Примечание: для полного переключения темы нужно обновить MaterialApp
-    // В реальном проекте это делается через провайдер тем
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,27 +16,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // Раздел: Внешний вид
-          _buildSectionTitle('Внешний вид'),
-          Card(
-            child: SwitchListTile(
-              title: const Text('Тёмная тема'),
-              subtitle: const Text('Включить тёмный режим'),
-              value: _isDarkMode,
-              onChanged: _toggleTheme,
-              secondary: const Icon(Icons.dark_mode),
-            ),
+          _buildSectionTitle('Внешний вид', context),
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, child) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              
+              return Card(
+                child: SwitchListTile(
+                  title: Text(
+                    'Тёмная тема',
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'Включить тёмный режим',
+                    style: TextStyle(
+                      color: isDark ? Colors.white60 : Colors.grey[600],
+                    ),
+                  ),
+                  value: themeProvider.isDarkMode,
+                  onChanged: themeProvider.toggleTheme,
+                  secondary: Icon(
+                    themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                    color: isDark ? Colors.white70 : Colors.grey[600],
+                  ),
+                  activeColor: Theme.of(context).primaryColor,
+                  activeTrackColor: Theme.of(context).primaryColor.withOpacity(0.5),
+                  hoverColor: Theme.of(context).primaryColor.withOpacity(0.1),
+                ),
+              );
+            },
           ),
           
           const SizedBox(height: 24),
           
           // Раздел: Данные
-          _buildSectionTitle('Данные'),
+          _buildSectionTitle('Данные', context),
           Card(
             child: ListTile(
               leading: const Icon(Icons.visibility),
               title: const Text('Просмотреть данные'),
               subtitle: const Text('Показать всю информацию'),
-              onTap: () => _showDataSummary(),
+              onTap: () => _showDataSummary(context),
             ),
           ),
           Card(
@@ -75,45 +66,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.delete_forever, color: Colors.red),
               title: const Text('Очистить все данные'),
               subtitle: const Text('Удалить всё безвозвратно'),
-              onTap: () => _confirmClearAll(),
+              onTap: () => _confirmClearAll(context),
               trailing: const Icon(Icons.chevron_right),
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Раздел: О приложении
-          _buildSectionTitle('О приложении'),
-          const Card(
-            child: Column(
-              children: [
-                ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('Версия'),
-                  subtitle: Text('1.0.0'),
-                ),
-                ListTile(
-                  leading: Icon(Icons.person),
-                  title: Text('Разработчик'),
-                  subtitle: Text('Студент'),
-                ),
-                ListTile(
-                  leading: Icon(Icons.school),
-                  title: Text('Учебный проект'),
-                  subtitle: Text('Flutter 2024'),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Кнопка сброса онбординга
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.restart_alt),
-              title: const Text('Показать приветствие снова'),
-              onTap: () => _resetOnboarding(),
             ),
           ),
         ],
@@ -121,21 +75,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
-        title.toUpperCase(), // Преобразуй текст напрямую
+        title.toUpperCase(),
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w600,
-          color: Colors.grey[600],
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[400]
+              : Colors.grey[600],
         ),
       ),
     );
   }
 
-  void _showDataSummary() {
+  void _showDataSummary(BuildContext context) {
     final provider = context.read<AppProvider>();
     
     showDialog(
@@ -177,7 +133,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _confirmClearAll() {
+  void _confirmClearAll(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -206,18 +162,5 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _resetOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isFirstLaunch', true);
-    
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-        (route) => false,
-      );
-    }
   }
 }

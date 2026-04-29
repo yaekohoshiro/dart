@@ -19,13 +19,6 @@ class _TeachersScreenState extends State<TeachersScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Преподаватели'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fillTestData,
-            tooltip: 'Тестовые данные',
-          ),
-        ],
       ),
       body: Consumer<AppProvider>(
         builder: (context, provider, child) {
@@ -121,33 +114,38 @@ class _TeachersScreenState extends State<TeachersScreen> {
   }
 
   Future<void> _makeCall(String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    if (mounted) {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось совершить звонок')),
-      );
-    }
-  }
-
-  Future<void> _sendEmail(String email) async {
-    final uri = Uri.parse('mailto:$email');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось открыть почту')),
-      );
-    }
-  }
-
-  void _fillTestData() {
-    context.read<AppProvider>().fillTestData();
+  if (phone.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Тестовые данные добавлены')),
+      const SnackBar(content: Text('Номер телефона не указан')),
+    );
+    return;
+  }
+  
+  final uri = Uri.parse('tel:$phone');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri);
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Не удалось совершить звонок')),
     );
   }
+}
+
+Future<void> _sendEmail(String email) async {
+  if (email.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Email не указан')),
+    );
+    return;
+  }
+  
+  final uri = Uri.parse('mailto:$email');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri);
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Не удалось открыть почту')),
+    );
+  }
+}
 }

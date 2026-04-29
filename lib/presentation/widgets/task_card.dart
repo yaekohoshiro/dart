@@ -17,31 +17,11 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Цвет в зависимости от срочности
-    Color urgencyColor;
-    String urgencyText;
-    
-    switch (task.urgencyStatus) {
-      case 'today':
-        urgencyColor = Colors.red;
-        urgencyText = 'Сегодня!';
-        break;
-      case 'urgent':
-        urgencyColor = Colors.orange;
-        urgencyText = '${task.daysUntilDeadline} дн.';
-        break;
-      case 'soon':
-        urgencyColor = Colors.amber;
-        urgencyText = '${task.daysUntilDeadline} дн.';
-        break;
-      case 'done':
-        urgencyColor = Colors.green;
-        urgencyText = 'Выполнено';
-        break;
-      default:
-        urgencyColor = Colors.grey;
-        urgencyText = '${task.daysUntilDeadline} дн.';
-    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final subtitleColor = isDark ? Colors.white70 : Colors.grey[700];
+
+    final priorityColor = task.getPriorityColor();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -63,81 +43,113 @@ class TaskCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Чекбокс
                 Checkbox(
                   value: task.isCompleted,
                   onChanged: (_) => onToggle?.call(),
                   activeColor: Colors.green,
+                  checkColor: Colors.white,
                 ),
                 
                 const SizedBox(width: 12),
                 
-                // Контент
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        task.title,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              decoration: task.isCompleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              color: task.isCompleted ? Colors.grey : null,
+                      // Заголовок + приоритет
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor,
+                                    decoration: task.isCompleted
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                  ),
                             ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: priorityColor.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  task.getPriorityIcon(),
+                                  size: 14,
+                                  color: priorityColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  task.getPriorityText(),
+                                  style: TextStyle(
+                                    color: priorityColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                       
+                      // Предмет (если есть)
+                      if (task.subject.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.book, size: 14, color: subtitleColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              task.subject,
+                              style: TextStyle(
+                                color: subtitleColor,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      
+                      // Описание
                       if (task.description.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           task.description,
                           style: TextStyle(
-                            color: Colors.grey[600],
+                            color: subtitleColor,
                             fontSize: 14,
-                            decoration: task.isCompleted
-                                ? TextDecoration.lineThrough
-                                : null,
                           ),
                         ),
                       ],
                       
                       const SizedBox(height: 8),
                       
-                      // Дедлайн и статус
+                      // Дедлайн
                       Row(
                         children: [
                           Icon(
                             Icons.calendar_today,
                             size: 14,
-                            color: urgencyColor,
+                            color: priorityColor,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             '${task.deadline.day}.${task.deadline.month}.${task.deadline.year}',
                             style: TextStyle(
-                              color: urgencyColor,
+                              color: priorityColor,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: urgencyColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              urgencyText,
-                              style: TextStyle(
-                                color: urgencyColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
                             ),
                           ),
                         ],
@@ -146,8 +158,8 @@ class TaskCard extends StatelessWidget {
                   ),
                 ),
                 
-                // Кнопка меню
                 PopupMenuButton(
+                  icon: Icon(Icons.more_vert, color: textColor),
                   itemBuilder: (context) => [
                     const PopupMenuItem(
                       value: 'edit',

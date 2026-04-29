@@ -1,21 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-
-// Провайдеры
+import 'package:intl/date_symbol_data_local.dart';
 import 'presentation/providers/app_provider.dart';
-
-// Экраны
+import 'presentation/providers/theme_provider.dart';
 import 'presentation/screens/main_screen.dart';
-import 'presentation/screens/onboarding_screen.dart';
-import 'presentation/screens/add_lesson_screen.dart';
-import 'presentation/screens/add_task_screen.dart';
-import 'presentation/screens/add_teacher_screen.dart';
-
-// Темы
 import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Инициализация русской локали для дат
+  await initializeDateFormatting('ru_RU', null);
+  
   runApp(const MyApp());
 }
 
@@ -27,95 +24,32 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AppProvider()),
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
       ],
-      child: MaterialApp(
-        title: 'StudentFlow',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const SplashScreen(),
-          '/main': (context) => const MainScreen(),
-          '/add-lesson': (context) => const AddLessonScreen(),
-          '/add-task': (context) => const AddTaskScreen(),
-          '/add-teacher': (context) => const AddTeacherScreen(),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            title: 'StudentFlow',
+            debugShowCheckedModeBanner: false,
+            
+            // 🇷🇺 Настройки локализации
+            locale: const Locale('ru', 'RU'),
+            supportedLocales: const [
+              Locale('ru', 'RU'),
+              Locale('en', 'US'),
+            ],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
+            home: const MainScreen(),
+          );
         },
-      ),
-    );
-  }
-}
-
-/// Экран проверки первого запуска
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    _checkOnboarding();
-  }
-
-  Future<void> _checkOnboarding() async {
-    await Future.delayed(const Duration(seconds: 1));
-    
-    // Упрощённая проверка (без SharedPreferences для простоты)
-    // В реальном проекте используйте SharedPreferences
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).primaryColor,
-              Theme.of(context).colorScheme.secondary,
-            ],
-          ),
-        ),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.school,
-                size: 100,
-                color: Colors.white,
-              ),
-              SizedBox(height: 24),
-              Text(
-                'StudentFlow',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Твой помощник в учёбе',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white70,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

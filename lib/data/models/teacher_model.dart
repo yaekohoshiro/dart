@@ -1,14 +1,16 @@
+import 'dart:convert';
+
 class Teacher {
   final int id;
   final String fullName;
-  final String subject;
+  final List<String> subjects; // Теперь список предметов!
   final String phone;
   final String email;
 
   Teacher({
     required this.id,
     required this.fullName,
-    required this.subject,
+    required this.subjects,
     required this.phone,
     required this.email,
   });
@@ -16,36 +18,50 @@ class Teacher {
   Teacher copyWith({
     int? id,
     String? fullName,
-    String? subject,
+    List<String>? subjects,
     String? phone,
     String? email,
   }) {
     return Teacher(
       id: id ?? this.id,
       fullName: fullName ?? this.fullName,
-      subject: subject ?? this.subject,
+      subjects: subjects ?? this.subjects,
       phone: phone ?? this.phone,
       email: email ?? this.email,
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'fullName': fullName,
-      'subject': subject,
+  Map<String, dynamic> toMap({bool forInsert = false}) {
+    final map = <String, dynamic>{
+      'full_name': fullName,
+      'subjects': jsonEncode(subjects), // Сохраняем как JSON
       'phone': phone,
       'email': email,
     };
+    
+    if (!forInsert) {
+      map['id'] = id;
+    }
+    
+    return map;
   }
 
   factory Teacher.fromMap(Map<String, dynamic> map) {
+    List<String> subjectsList;
+    if (map['subjects'] is String) {
+      subjectsList = List<String>.from(jsonDecode(map['subjects'] as String));
+    } else if (map['subjects'] is List) {
+      subjectsList = List<String>.from(map['subjects']);
+    } else {
+      subjectsList = [];
+    }
+    
     return Teacher(
-      id: map['id'],
-      fullName: map['fullName'],
-      subject: map['subject'],
-      phone: map['phone'],
-      email: map['email'],
+      id: map['id'] as int,
+      fullName: map['full_name'] as String,
+      subjects: subjectsList,
+      phone: map['phone'] as String? ?? '',
+      email: map['email'] as String? ?? '',
     );
   }
 }

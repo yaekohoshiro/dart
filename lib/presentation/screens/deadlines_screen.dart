@@ -26,11 +26,6 @@ class _DeadlinesScreenState extends State<DeadlinesScreen> {
             onPressed: _clearCompleted,
             tooltip: 'Очистить выполненные',
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fillTestData,
-            tooltip: 'Тестовые данные',
-          ),
         ],
       ),
       body: Column(
@@ -42,15 +37,20 @@ class _DeadlinesScreenState extends State<DeadlinesScreen> {
           Expanded(
             child: Consumer<AppProvider>(
               builder: (context, provider, child) {
-                List tasks;
+                List<Task> tasks;
                 
                 if (_filter == 'active') {
                   tasks = provider.activeTasks;
                 } else if (_filter == 'completed') {
                   tasks = provider.completedTasks;
                 } else {
+                  // Все задачи: сортируем по приоритету, потом по дате
                   tasks = provider.tasks
-                    ..sort((a, b) => a.deadline.compareTo(b.deadline));
+                    ..sort((a, b) {
+                      final priorityCompare = b.priority.index.compareTo(a.priority.index);
+                      if (priorityCompare != 0) return priorityCompare;
+                      return a.deadline.compareTo(b.deadline);
+                    });
                 }
                 
                 if (tasks.isEmpty) {
@@ -83,27 +83,68 @@ class _DeadlinesScreenState extends State<DeadlinesScreen> {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          _buildFilterChip('Все', 'all'),
+          Expanded(child: _buildFilterChip('Все', 'all')),
           const SizedBox(width: 8),
-          _buildFilterChip('Активные', 'active'),
+          Expanded(child: _buildFilterChip('Активные', 'active')),
           const SizedBox(width: 8),
-          _buildFilterChip('Выполненые', 'completed'),
+          Expanded(child: _buildFilterChip('Выполненные', 'completed')),
         ],
       ),
     );
   }
-
+  
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _filter == value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() => _filter = value);
-      },
-      selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-      checkmarkColor: Theme.of(context).primaryColor,
+    return Container(
+      decoration: BoxDecoration(
+        color: isSelected 
+            ? Theme.of(context).primaryColor 
+            : (isDark ? const Color(0xFF2D2D2D) : Colors.grey[200]),
+        borderRadius: BorderRadius.circular(12),
+        border: isSelected 
+            ? null 
+            : Border.all(
+                color: isDark ? Colors.white24 : Colors.grey[400]!,
+                width: 1.5,
+              ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _filter = value),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isSelected) ...[
+                  const Icon(Icons.check, size: 14, color: Colors.white),
+                  const SizedBox(width: 4),
+                ],
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected 
+                          ? Colors.white 
+                          : (isDark ? Colors.white : Colors.black87),
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -202,13 +243,6 @@ class _DeadlinesScreenState extends State<DeadlinesScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  void _fillTestData() {
-    context.read<AppProvider>().fillTestData();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Тестовые данные добавлены')),
     );
   }
 }

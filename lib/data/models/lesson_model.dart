@@ -5,7 +5,7 @@ class Lesson {
   final String roomNumber;
   final String startTime;
   final String endTime;
-  final int dayOfWeek; // 1 = Пн, 2 = Вт, ..., 7 = Вс
+  final DateTime date;
 
   Lesson({
     required this.id,
@@ -14,10 +14,9 @@ class Lesson {
     required this.roomNumber,
     required this.startTime,
     required this.endTime,
-    required this.dayOfWeek,
+    required this.date,
   });
 
-  // Создаём копию объекта (для редактирования)
   Lesson copyWith({
     int? id,
     String? subjectName,
@@ -25,7 +24,7 @@ class Lesson {
     String? roomNumber,
     String? startTime,
     String? endTime,
-    int? dayOfWeek,
+    DateTime? date,
   }) {
     return Lesson(
       id: id ?? this.id,
@@ -34,33 +33,45 @@ class Lesson {
       roomNumber: roomNumber ?? this.roomNumber,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
-      dayOfWeek: dayOfWeek ?? this.dayOfWeek,
+      date: date ?? this.date,
     );
   }
 
-  // Преобразуем в Map (для сохранения в будущем, если понадобится)
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'subjectName': subjectName,
-      'teacherName': teacherName,
-      'roomNumber': roomNumber,
-      'startTime': startTime,
-      'endTime': endTime,
-      'dayOfWeek': dayOfWeek,
+  Map<String, dynamic> toMap({bool forInsert = false}) {
+    final map = <String, dynamic>{
+      'subject_name': subjectName,
+      'teacher_name': teacherName,
+      'room_number': roomNumber,
+      'start_time': startTime,
+      'end_time': endTime,
+      'date': date.toIso8601String().split('T')[0], // YYYY-MM-DD
     };
+    
+    if (!forInsert) {
+      map['id'] = id;
+    }
+    
+    return map;
   }
 
-  // Создаём из Map
   factory Lesson.fromMap(Map<String, dynamic> map) {
     return Lesson(
-      id: map['id'],
-      subjectName: map['subjectName'],
-      teacherName: map['teacherName'],
-      roomNumber: map['roomNumber'],
-      startTime: map['startTime'],
-      endTime: map['endTime'],
-      dayOfWeek: map['dayOfWeek'],
+      id: map['id'] as int,
+      subjectName: map['subject_name'] as String,
+      teacherName: map['teacher_name'] as String,
+      roomNumber: map['room_number'] as String,
+      startTime: map['start_time'] as String,
+      endTime: map['end_time'] as String,
+      date: DateTime.parse(map['date'] as String),
     );
+  }
+
+  String get formattedDate {
+    return '${date.day}.${date.month}.${date.year}';
+  }
+
+  String get dayName {
+    const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    return days[date.weekday - 1];
   }
 }
