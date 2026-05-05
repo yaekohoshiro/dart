@@ -1,16 +1,19 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
   DatabaseHelper._init() {
-    // Инициализация FFI для desktop (Windows/Mac/Linux)
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    // Инициализация FFI ТОЛЬКО для Desktop
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      // Для Desktop нужен sqflite_common_ffi
+      // Но на мобильных используем стандартный sqflite
+    }
   }
 
   Future<Database> get database async {
@@ -20,12 +23,22 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'studentflow.db');
+    String path;
+    
+    // Правильный путь для каждой платформы
+    if (Platform.isAndroid || Platform.isIOS) {
+      // Мобильные: стандартный путь для баз данных
+      final dbPath = await getDatabasesPath();
+      path = join(dbPath, 'studentflow.db');
+    } else {
+      // Desktop: путь в документах приложения
+      final appDir = await getApplicationDocumentsDirectory();
+      path = join(appDir.path, 'studentflow.db');
+    }
 
     return await openDatabase(
       path,
-      version: 4, 
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -38,7 +51,6 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         subject_name TEXT NOT NULL,
         teacher_name TEXT NOT NULL,
-        teacher_id INTEGER,
         room_number TEXT,
         start_time TEXT NOT NULL,
         end_time TEXT NOT NULL,
@@ -54,6 +66,7 @@ class DatabaseHelper {
         description TEXT NOT NULL,
         deadline TEXT NOT NULL,
         priority INTEGER NOT NULL DEFAULT 1,
+        subject TEXT NOT NULL DEFAULT '',
         is_completed INTEGER NOT NULL DEFAULT 0
       )
     ''');
@@ -70,20 +83,19 @@ class DatabaseHelper {
     ''');
   }
 
-  // Миграция
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       final tableInfo = await db.rawQuery('PRAGMA table_info(tasks)');
-      final hasPriorityColumn = tableInfo.any((column) => column['name'] == 'priority');
-
-      if (!hasPriorityColumn) {
+      final hasPriority = tableInfo.any((c) => c['name'] == 'priority');
+      if (!hasPriority) {
         await db.execute('ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 1');
       }
     }
-
+    
     if (oldVersion < 3) {
       await db.execute('ALTER TABLE lessons ADD COLUMN teacher_id INTEGER');
-
+      
+      // Миграция teachers: subject → subjects (JSON)
       await db.execute('''
         CREATE TABLE teachers_new (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,35 +105,31 @@ class DatabaseHelper {
           email TEXT
         )
       ''');
-
-      final oldTeachers = await db.query('teachers');
-      for (var teacher in oldTeachers) {
+      
+      final old = await db.query('teachers');
+      for (var t in old) {
         await db.insert('teachers_new', {
-          'id': teacher['id'],
-          'full_name': teacher['full_name'],
-          'subjects': jsonEncode([teacher['subject']]),
-          'phone': teacher['phone'] ?? '',
-          'email': teacher['email'] ?? '',
+          'id': t['id'],
+          'full_name': t['full_name'],
+          'subjects': jsonEncode([t['subject']]),
+          'phone': t['phone'] ?? '',
+          'email': t['email'] ?? '',
         });
       }
-
       await db.execute('DROP TABLE teachers');
       await db.execute('ALTER TABLE teachers_new RENAME TO teachers');
     }
-
+    
     if (oldVersion < 4) {
-      // Добавляем колонку subject в tasks
       final tableInfo = await db.rawQuery('PRAGMA table_info(tasks)');
-      final hasSubjectColumn = tableInfo.any((column) => column['name'] == 'subject');
-
-      if (!hasSubjectColumn) {
+      final hasSubject = tableInfo.any((c) => c['name'] == 'subject');
+      if (!hasSubject) {
         await db.execute('ALTER TABLE tasks ADD COLUMN subject TEXT NOT NULL DEFAULT ""');
       }
     }
   }
 
   // ==================== LESSONS ====================
-
   Future<int> createLesson(Map<String, dynamic> lesson) async {
     final db = await database;
     return await db.insert('lessons', lesson);
@@ -134,22 +142,12 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getLessonsByDate(String date) async {
     final db = await database;
-    return await db.query(
-      'lessons',
-      where: 'date = ?',
-      whereArgs: [date],
-      orderBy: 'start_time',
-    );
+    return await db.query('lessons', where: 'date = ?', whereArgs: [date], orderBy: 'start_time');
   }
 
   Future<int> updateLesson(Map<String, dynamic> lesson) async {
     final db = await database;
-    return await db.update(
-      'lessons',
-      lesson,
-      where: 'id = ?',
-      whereArgs: [lesson['id']],
-    );
+    return await db.update('lessons', lesson, where: 'id = ?', whereArgs: [lesson['id']]);
   }
 
   Future<int> deleteLesson(int id) async {
@@ -157,6 +155,54 @@ class DatabaseHelper {
     return await db.delete('lessons', where: 'id = ?', whereArgs: [id]);
   }
 
+  // ==================== TASKS ====================
+  Future<int> createTask(Map<String, dynamic> task) async {
+    final db = await database;
+    return await db.insert('tasks', task);
+  }
+
+  Future<List<Map<String, dynamic>>> getTasks() async {
+    final db = await database;
+    return await db.query('tasks', orderBy: 'priority DESC, deadline ASC');
+  }
+
+  Future<int> updateTask(Map<String, dynamic> task) async {
+    final db = await database;
+    return await db.update('tasks', task, where: 'id = ?', whereArgs: [task['id']]);
+  }
+
+  Future<int> deleteTask(int id) async {
+    final db = await database;
+    return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteCompletedTasks() async {
+    final db = await database;
+    return await db.delete('tasks', where: 'is_completed = ?', whereArgs: [1]);
+  }
+
+  // ==================== TEACHERS ====================
+  Future<int> createTeacher(Map<String, dynamic> teacher) async {
+    final db = await database;
+    return await db.insert('teachers', teacher);
+  }
+
+  Future<List<Map<String, dynamic>>> getTeachers() async {
+    final db = await database;
+    return await db.query('teachers');
+  }
+
+  Future<int> updateTeacher(Map<String, dynamic> teacher) async {
+    final db = await database;
+    return await db.update('teachers', teacher, where: 'id = ?', whereArgs: [teacher['id']]);
+  }
+
+  Future<int> deleteTeacher(int id) async {
+    final db = await database;
+    return await db.delete('teachers', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ==================== UTILS ====================
   Future<void> clearAllTables() async {
     final db = await database;
     await db.delete('lessons');
@@ -173,68 +219,6 @@ class DatabaseHelper {
     final path = join(dbPath, 'studentflow.db');
     await deleteDatabase(path);
   }
-
-  // ==================== TASKS ====================
-
-  Future<int> createTask(Map<String, dynamic> task) async {
-    final db = await database;
-    return await db.insert('tasks', task);
-  }
-
-  Future<List<Map<String, dynamic>>> getTasks() async {
-    final db = await database;
-    // Сортируем: сначала по приоритету (DESC), потом по дедлайну (ASC)
-    return await db.query('tasks', orderBy: 'priority DESC, deadline ASC');
-  }
-
-  Future<int> updateTask(Map<String, dynamic> task) async {
-    final db = await database;
-    return await db.update(
-      'tasks',
-      task,
-      where: 'id = ?',
-      whereArgs: [task['id']],
-    );
-  }
-
-  Future<int> deleteTask(int id) async {
-    final db = await database;
-    return await db.delete('tasks', where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<int> deleteCompletedTasks() async {
-    final db = await database;
-    return await db.delete('tasks', where: 'is_completed = ?', whereArgs: [1]);
-  }
-
-  // ==================== TEACHERS ====================
-
-  Future<int> createTeacher(Map<String, dynamic> teacher) async {
-    final db = await database;
-    return await db.insert('teachers', teacher);
-  }
-
-  Future<List<Map<String, dynamic>>> getTeachers() async {
-    final db = await database;
-    return await db.query('teachers');
-  }
-
-  Future<int> updateTeacher(Map<String, dynamic> teacher) async {
-    final db = await database;
-    return await db.update(
-      'teachers',
-      teacher,
-      where: 'id = ?',
-      whereArgs: [teacher['id']],
-    );
-  }
-
-  Future<int> deleteTeacher(int id) async {
-    final db = await database;
-    return await db.delete('teachers', where: 'id = ?', whereArgs: [id]);
-  }
-
-  // ==================== UTILS ====================
 
   Future<int> getCount(String table) async {
     final db = await database;

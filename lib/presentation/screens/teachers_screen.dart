@@ -37,8 +37,6 @@ class _TeachersScreenState extends State<TeachersScreen> {
                 teacher: teacher,
                 onEdit: () => _editTeacher(teacher),
                 onDelete: () => _deleteTeacher(teacher),
-                onCall: () => _makeCall(teacher.phone),
-                onEmail: () => _sendEmail(teacher.email),
               );
             },
           );

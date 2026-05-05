@@ -1,20 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../data/models/teacher_model.dart';
 
 class TeacherCard extends StatelessWidget {
   final Teacher teacher;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
-  final VoidCallback? onCall;
-  final VoidCallback? onEmail;
 
   const TeacherCard({
     super.key,
     required this.teacher,
     this.onEdit,
     this.onDelete,
-    this.onCall,
-    this.onEmail,
   });
 
   bool _isValidEmail(String email) {
@@ -154,7 +151,9 @@ class TeacherCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: hasValidPhone ? onCall : null,
+                    onPressed: hasValidPhone 
+                        ? () => _launchPhone(context, teacher.phone) 
+                        : null,
                     icon: const Icon(Icons.phone, size: 18),
                     label: const Text('Позвонить'),
                     style: OutlinedButton.styleFrom(
@@ -169,7 +168,9 @@ class TeacherCard extends StatelessWidget {
                 
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: hasValidEmail ? onEmail : null,
+                    onPressed: hasValidEmail 
+                        ? () => _launchEmail(context, teacher.email) 
+                        : null,
                     icon: const Icon(Icons.email, size: 18),
                     label: const Text('Написать'),
                     style: OutlinedButton.styleFrom(
@@ -185,5 +186,49 @@ class TeacherCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _launchPhone(BuildContext context, String phoneNumber) async {
+    final uri = Uri.parse('tel:$phoneNumber');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Не удалось совершить звонок')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Ошибка звонка: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка при звонке')),
+        );
+      }
+    }
+  }
+
+  Future<void> _launchEmail(BuildContext context, String email) async {
+    final uri = Uri.parse('mailto:$email');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Не удалось открыть почтовое приложение')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Ошибка email: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ошибка при отправке письма')),
+        );
+      }
+    }
   }
 }
