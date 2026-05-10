@@ -251,11 +251,16 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.person),
                     ),
+                    isExpanded: true,
                     hint: const Text('Выберите преподавателя'),
                     items: teachers.map((teacher) {
                       return DropdownMenuItem(
                         value: teacher.id,
-                        child: Text(teacher.fullName),
+                        child: Text(
+                          teacher.fullName,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          ),
                       );
                     }).toList(),
                     onChanged: _onTeacherSelected,
@@ -297,10 +302,15 @@ class _AddLessonScreenState extends State<AddLessonScreen> {
                           decoration: const InputDecoration(
                             prefixIcon: Icon(Icons.book),
                           ),
+                          isExpanded: true,
                           items: teacher.subjects.map((subject) {
                             return DropdownMenuItem(
                               value: subject,
-                              child: Text(subject),
+                              child: Text(
+                                subject,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                ),
                             );
                           }).toList(),
                           onChanged: _onSubjectSelected,
