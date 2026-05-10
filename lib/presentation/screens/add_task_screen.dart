@@ -186,11 +186,16 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.book),
                     ),
+                    isExpanded: true,
                     hint: const Text('Выберите предмет'),
                     items: subjectsList.map((subject) {
                       return DropdownMenuItem(
                         value: subject,
-                        child: Text(subject),
+                        child: Text(
+                          subject,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          ),
                       );
                     }).toList(),
                     onChanged: (value) {

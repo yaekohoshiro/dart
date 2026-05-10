@@ -110,11 +110,15 @@ class TaskCard extends StatelessWidget {
                           children: [
                             Icon(Icons.book, size: 14, color: subtitleColor),
                             const SizedBox(width: 4),
-                            Text(
-                              task.subject,
-                              style: TextStyle(
-                                color: subtitleColor,
-                                fontSize: 13,
+                            Expanded(  // ← Добавь Expanded!
+                              child: Text(
+                                task.subject,
+                                style: TextStyle(
+                                  color: subtitleColor,
+                                  fontSize: 13,
+                                ),
+                                overflow: TextOverflow.ellipsis,  // ← Добавь это!
+                                maxLines: 1,
                               ),
                             ),
                           ],
